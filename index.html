@@ -1,0 +1,1023 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no">
+<title>RILZZ.STREAM — toolkit obs</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#05070E;
+    --panel:rgba(18,26,48,.5);
+    --panel-2:rgba(24,34,60,.55);
+    --line:rgba(255,255,255,.10);
+    --text:#EAF0FF;
+    --muted:#8E9AC2;
+    --live:#FF3B57;
+    --live-dim:rgba(255,59,87,.22);
+    --ok:#3B7BFF;
+    --ok-dim:rgba(59,123,255,.22);
+    --amber:#FF6B8B;
+    --ov-accent:#3B7BFF;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background-color:var(--bg);
+    background-image:
+      radial-gradient(circle at 12% 8%, rgba(59,123,255,.28), transparent 45%),
+      radial-gradient(circle at 92% 18%, rgba(255,59,87,.22), transparent 40%),
+      radial-gradient(circle at 30% 95%, rgba(59,123,255,.14), transparent 45%);
+    background-attachment:fixed;
+    color:var(--text);
+    font-family:'Inter',system-ui,sans-serif;
+    -webkit-tap-highlight-color:transparent;
+    min-height:100vh;
+  }
+  .wrap{max-width:480px;margin:0 auto;padding:16px 14px 48px;}
+  .layout{display:block;}
+  .content{min-width:0;}
+
+  /* handmade touches: a little grain + a tilted signature tag so it doesn't read as a flat generated ui */
+  body::before{
+    content:'';position:fixed;inset:0;pointer-events:none;opacity:.035;z-index:1;mix-blend-mode:overlay;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  .signature{
+    display:inline-block;font-family:'Oswald',sans-serif;font-size:10.5px;color:var(--muted);
+    transform:rotate(-2deg);letter-spacing:.5px;margin-left:8px;opacity:.7;
+  }
+
+  .head{display:flex;align-items:center;gap:10px;margin-bottom:14px;}
+  .tally{width:11px;height:11px;border-radius:50%;background:var(--muted);flex-shrink:0;transition:background .2s;}
+  .tally.live{background:var(--live);box-shadow:0 0 0 4px var(--live-dim);}
+  .tally.ok{background:var(--ok);box-shadow:0 0 0 4px var(--ok-dim);}
+  h1{font-family:'Oswald',sans-serif;font-weight:700;font-size:21px;margin:0;line-height:1.1;
+    background:linear-gradient(90deg,#7FA8FF,#FF8FA3);-webkit-background-clip:text;background-clip:text;color:transparent;}
+  .sub{color:var(--muted);font-size:12.5px;margin:2px 0 0;}
+
+  /* main nav */
+  .nav{display:flex;gap:6px;overflow-x:auto;margin-bottom:14px;padding-bottom:2px;-ms-overflow-style:none;scrollbar-width:none;}
+  .nav::-webkit-scrollbar{display:none;}
+  .nav button{
+    flex:0 0 auto;border:1px solid var(--line);background:rgba(255,255,255,.04);backdrop-filter:blur(8px);color:var(--muted);
+    font-family:'Oswald',sans-serif;font-weight:500;font-size:12px;letter-spacing:.4px;
+    padding:9px 14px;border-radius:20px;cursor:pointer;white-space:nowrap;
+  }
+  .nav button.active{background:linear-gradient(90deg,var(--ok),#6D5CFF);color:#fff;border-color:transparent;}
+
+  .panel{background:var(--panel);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:14px;box-shadow:0 8px 24px rgba(0,0,0,.25);}
+  .panel h2{font-family:'Oswald',sans-serif;font-size:14px;font-weight:600;margin:0 0 10px;color:var(--muted);letter-spacing:.3px;}
+
+  video{width:100%;border-radius:8px;background:#000;display:block;aspect-ratio:9/16;object-fit:cover;}
+  #remoteVideo{aspect-ratio:16/9;}
+
+  .row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}
+  button.btn{
+    font-family:'Inter',sans-serif;font-weight:600;font-size:14px;
+    border:1px solid var(--line);background:rgba(255,255,255,.05);backdrop-filter:blur(10px);color:var(--text);
+    padding:11px 14px;border-radius:9px;cursor:pointer;flex:1;min-width:120px;
+  }
+  button.btn:active{transform:scale(.98);}
+  button.btn.primary{background:linear-gradient(135deg,var(--ok),#6D5CFF);border-color:transparent;color:#fff;box-shadow:0 4px 16px rgba(59,123,255,.35);}
+  button.btn.danger{background:linear-gradient(135deg,var(--live),#FF7A5C);border-color:transparent;color:#fff;box-shadow:0 4px 16px rgba(255,59,87,.3);}
+  button.btn.ghost{background:rgba(255,255,255,.03);}
+  button.btn:disabled{opacity:.35;cursor:default;box-shadow:none;}
+
+  textarea, input[type=text], input[type=number]{
+    width:100%;background:rgba(0,0,0,.35);color:var(--text);border:1px solid var(--line);
+    border-radius:8px;padding:10px;font-family:'JetBrains Mono',monospace;font-size:12px;
+  }
+  textarea{min-height:64px;resize:vertical;}
+  .field-label{font-size:12px;color:var(--muted);margin:10px 0 5px;}
+  .status{font-size:13px;color:var(--muted);display:flex;align-items:center;gap:7px;margin-top:8px;}
+  .note{font-size:12px;color:var(--muted);line-height:1.5;background:rgba(59,123,255,.08);border:1px solid rgba(59,123,255,.25);border-radius:8px;padding:10px;margin-top:10px;}
+  .note.warn{background:rgba(255,59,87,.08);border-color:rgba(255,59,87,.28);}
+  .steps{font-size:13px;color:var(--muted);line-height:1.7;margin:0 0 4px;padding-left:18px;}
+  .timer{font-family:'Oswald',sans-serif;font-size:13px;color:var(--live);}
+  a.dl{color:var(--ok);font-size:13px;text-decoration:underline;display:inline-block;margin-top:6px;}
+  .hidden{display:none !important;}
+
+  /* sub-tabs (pill segmented control) */
+  .segmented{display:flex;background:rgba(0,0,0,.3);border:1px solid var(--line);border-radius:10px;padding:3px;margin-bottom:12px;}
+  .segmented button{flex:1;border:0;background:transparent;color:var(--muted);font-size:12.5px;font-weight:600;padding:8px 4px;border-radius:7px;cursor:pointer;}
+  .segmented button.active{background:var(--panel-2);color:var(--text);}
+
+  /* generic output stage for overlay/qr, capturable as OBS browser source */
+  .stage{
+    background:#000;border-radius:10px;min-height:220px;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;text-align:center;overflow:hidden;position:relative;
+    padding:20px;border:1px solid var(--line);
+  }
+  .stage.transparent-preview{background:repeating-conic-gradient(#22262b 0% 25%, #191c20 0% 50%) 50%/16px 16px;}
+  .stage .big{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:15vw;max-font-size:64px;color:#fff;line-height:1;}
+  .stage .label{font-family:'Oswald',sans-serif;color:var(--ov-accent);font-size:14px;margin-bottom:6px;letter-spacing:1px;text-transform:uppercase;}
+  .stage .brbtext{font-family:'Oswald',sans-serif;font-size:32px;color:#fff;font-weight:600;}
+  .stage .dots span{opacity:.2;animation:blink 1.4s infinite;}
+  .stage .dots span:nth-child(2){animation-delay:.2s;}
+  .stage .dots span:nth-child(3){animation-delay:.4s;}
+  @keyframes blink{0%,80%,100%{opacity:.2;}40%{opacity:1;}}
+  .ticker-wrap{width:100%;overflow:hidden;background:rgba(0,0,0,.6);padding:10px 0;position:absolute;bottom:0;left:0;}
+  .ticker-move{display:inline-block;white-space:nowrap;font-family:'Oswald',sans-serif;font-size:22px;color:#fff;padding-left:100%;animation:tick linear infinite;}
+  @keyframes tick{from{transform:translateX(0);}to{transform:translateX(-100%);}}
+  .clockbig{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:52px;color:#fff;}
+  .clockdate{font-family:'Oswald',sans-serif;color:var(--muted);font-size:14px;margin-top:4px;}
+
+  .qr-img{width:100%;max-width:260px;border-radius:8px;background:#fff;padding:10px;}
+
+  /* mic meter */
+  .meter-wrap{background:rgba(0,0,0,.35);border:1px solid var(--line);border-radius:8px;height:26px;overflow:hidden;position:relative;}
+  .meter-bar{height:100%;width:0%;background:linear-gradient(90deg,var(--ok),var(--amber) 75%,var(--live) 92%);transition:width .06s linear;}
+  .meter-num{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--muted);margin-top:6px;}
+
+  /* stats */
+  .stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px;}
+  .stat-box{background:rgba(0,0,0,.35);border:1px solid var(--line);border-radius:8px;padding:9px 10px;}
+  .stat-box .k{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;}
+  .stat-box .v{font-family:'JetBrains Mono',monospace;font-size:15px;color:var(--text);margin-top:2px;}
+
+  /* mic controls */
+  .ptt-btn{user-select:none;}
+  .ptt-btn.active{background:var(--live) !important;border-color:var(--live) !important;color:#210606 !important;}
+
+  /* goal bar overlay */
+  .goal-label{font-family:'Oswald',sans-serif;color:var(--ov-accent);font-size:16px;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;}
+  .goal-bar-wrap{width:90%;height:26px;background:rgba(255,255,255,.12);border-radius:13px;overflow:hidden;}
+  .goal-bar-fill{height:100%;background:var(--ov-accent);border-radius:13px;transition:width .4s ease;}
+  .goal-nums{font-family:'JetBrains Mono',monospace;color:#fff;font-size:15px;margin-top:8px;}
+
+  /* lower third */
+  .l3-wrap{align-self:flex-start;margin-top:auto;margin-bottom:24px;text-align:left;display:flex;}
+  .l3-accent{width:5px;background:var(--ov-accent);border-radius:3px;margin-right:12px;}
+  .l3-name{font-family:'Oswald',sans-serif;font-size:26px;font-weight:600;color:#fff;}
+  .l3-title{font-family:'Inter',sans-serif;font-size:13px;color:var(--ov-accent);margin-top:2px;text-transform:uppercase;letter-spacing:1px;}
+
+  /* soundboard */
+  .sb-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .sb-btn{background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:18px 10px;color:var(--text);font-family:'Oswald',sans-serif;font-weight:600;font-size:14px;cursor:pointer;text-align:center;}
+  .sb-btn:active{transform:scale(.96);background:var(--ok);color:#0B1710;}
+
+  .kiosk-btn{position:fixed;top:10px;right:10px;z-index:20;background:rgba(0,0,0,.6);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:8px 12px;font-size:12px;cursor:pointer;}
+  body.kiosk .wrap{display:none;}
+  .kiosk-target-active{
+    position:fixed;inset:0;z-index:10;padding:16px;margin:0;border:0;border-radius:0;
+    background:var(--bg);display:flex;flex-direction:column;overflow:auto;
+  }
+  .kiosk-target-active .stage{flex:1;border-radius:0;min-height:0;}
+  .kiosk-target-active video{width:100%;height:100%;border-radius:0;aspect-ratio:auto;flex:1;object-fit:cover;}
+  body.kiosk.transparent-bg{background:transparent !important;}
+  body.kiosk.transparent-bg .kiosk-target-active{background:transparent !important;}
+  body.kiosk.transparent-bg .stage{background:transparent !important;}
+
+  /* desktop: sidebar nav instead of a horizontal pill scroller, content gets breathing room */
+  @media (min-width: 860px){
+    .wrap{max-width:1080px;padding:32px 28px 60px;}
+    .head{margin-bottom:24px;}
+    h1{font-size:26px;}
+    .layout{display:grid;grid-template-columns:190px 1fr;gap:28px;align-items:start;}
+    .nav{flex-direction:column;overflow:visible;position:sticky;top:24px;gap:8px;}
+    .nav button{width:100%;text-align:left;border-radius:9px;padding:11px 14px;}
+    .content{max-width:640px;}
+    video{max-height:60vh;}
+    .sb-grid{grid-template-columns:repeat(3,1fr);}
+  }
+  @media (min-width: 1180px){
+    .content{max-width:720px;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="head">
+    <div class="tally" id="tally"></div>
+    <div>
+      <h1>RILZZ.STREAM<span class="signature">— built by rilzz</span></h1>
+      <p class="sub">sambungan &amp; overlay obs, langsung dari browser</p>
+    </div>
+  </div>
+
+  <div class="layout">
+  <div class="nav">
+    <button data-tab="sambung" class="active">SAMBUNG</button>
+    <button data-tab="rekam">REKAM</button>
+    <button data-tab="overlay">OVERLAY</button>
+    <button data-tab="mic">MIC</button>
+    <button data-tab="qr">QR</button>
+    <button data-tab="suara">SFX</button>
+  </div>
+
+  <div class="content">
+  <!-- sambung -->
+  <div class="tabview" id="tab-sambung">
+    <div class="segmented">
+      <button id="tabSender" class="active">HP · Kirim Kamera</button>
+      <button id="tabReceiver">PC/OBS · Terima</button>
+    </div>
+
+    <div id="senderView">
+      <div class="panel">
+        <h2>Pratinjau Kamera</h2>
+        <video id="localVideo" autoplay playsinline muted></video>
+        <div class="row">
+          <button class="btn primary" id="startCam">Mulai Kamera</button>
+          <button class="btn ghost" id="flipCam" disabled>Balik Kamera</button>
+        </div>
+        <div class="field-label" id="camDeviceLabel" style="display:none;">Pilih kamera (kalau ada lebih dari satu, misal webcam USB di PC)</div>
+        <select id="camDeviceSelect" style="display:none;width:100%;background:rgba(0,0,0,.35);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:9px;font-family:'Inter',sans-serif;font-size:13px;"></select>
+        <div class="row">
+          <button class="btn ghost" id="micMute" disabled>Mic: Aktif</button>
+          <button class="btn ghost ptt-btn" id="micPtt" disabled>Tahan buat Bicara</button>
+        </div>
+        <div class="row">
+          <button class="btn ghost" id="snapLocal" disabled>Ambil Screenshot</button>
+        </div>
+        <p class="sub" style="margin-top:6px;">Ganti kamera &amp; mic bisa dipakai sambil tetap tersambung ke OBS, gak perlu sambung ulang. Pintasan keyboard (desktop): Spasi = mute mic, R = rekam.</p>
+      </div>
+
+      <div class="panel">
+        <h2>Sambungkan ke OBS</h2>
+        <ol class="steps">
+          <li>Buka halaman ini juga di PC (tempat OBS jalan), pilih tab "PC/OBS".</li>
+          <li>Di HP, tekan "Buat Kode" lalu salin kodenya.</li>
+          <li>Tempel kode itu di PC, lalu salin "Kode Jawaban" dari PC ke sini.</li>
+        </ol>
+        <button class="btn primary" id="makeOffer" disabled>Buat Kode Sambungan</button>
+        <div class="field-label">Kode dari HP (salin ke PC)</div>
+        <textarea id="offerOut" readonly placeholder="Muncul setelah tekan tombol di atas…"></textarea>
+        <button class="btn ghost" id="copyOffer">Salin Kode</button>
+
+        <div class="field-label">Tempel Kode Jawaban dari PC di sini</div>
+        <textarea id="answerIn" placeholder="Tempel kode jawaban dari PC…"></textarea>
+        <button class="btn primary" id="connectBtn">Sambungkan</button>
+        <div class="status"><span id="connStatusDot" class="tally"></span><span id="connStatusTxt">Belum tersambung</span></div>
+      </div>
+
+      <div class="panel">
+        <h2>Statistik Koneksi</h2>
+        <div class="stats-grid">
+          <div class="stat-box"><div class="k">Bitrate</div><div class="v" id="statBitrateS">—</div></div>
+          <div class="stat-box"><div class="k">Resolusi</div><div class="v" id="statResS">—</div></div>
+          <div class="stat-box"><div class="k">RTT</div><div class="v" id="statRttS">—</div></div>
+          <div class="stat-box"><div class="k">Status</div><div class="v" id="statStateS">idle</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="receiverView" class="hidden">
+      <div class="panel">
+        <h2>Terima dari HP</h2>
+        <div class="field-label">Tempel Kode dari HP di sini</div>
+        <textarea id="offerIn" placeholder="Tempel kode dari HP…"></textarea>
+        <button class="btn primary" id="makeAnswer">Buat Kode Jawaban</button>
+
+        <div class="field-label">Kode Jawaban (salin balik ke HP)</div>
+        <textarea id="answerOut" readonly placeholder="Muncul setelah tekan tombol di atas…"></textarea>
+        <button class="btn ghost" id="copyAnswer">Salin Kode Jawaban</button>
+        <div class="status"><span id="rConnDot" class="tally"></span><span id="rConnTxt">Menunggu sambungan…</span></div>
+      </div>
+
+      <div class="panel">
+        <h2>Statistik Koneksi</h2>
+        <div class="stats-grid">
+          <div class="stat-box"><div class="k">Bitrate</div><div class="v" id="statBitrateR">—</div></div>
+          <div class="stat-box"><div class="k">Resolusi</div><div class="v" id="statResR">—</div></div>
+          <div class="stat-box"><div class="k">Paket Hilang</div><div class="v" id="statLossR">—</div></div>
+          <div class="stat-box"><div class="k">Status</div><div class="v" id="statStateR">idle</div></div>
+        </div>
+      </div>
+
+      <div class="panel" id="kioskArea">
+        <h2>Tampilan Kamera HP (untuk OBS)</h2>
+        <video id="remoteVideo" autoplay playsinline></video>
+        <div class="row"><button class="btn ghost" id="snapRemote" disabled>Ambil Screenshot</button></div>
+        <div class="note">Tambahkan halaman ini sebagai "Browser Source" di OBS, lalu tekan "Layar Penuh" di pojok kanan atas biar bersih tanpa panel ini.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- rekam -->
+  <div class="tabview hidden" id="tab-rekam">
+    <div class="panel">
+      <h2>Kamera buat Rekam</h2>
+      <p class="sub" style="margin-bottom:8px;">Pakai kamera yang sama dari tab Sambung. Kalau belum aktif, tekan tombol ini dulu.</p>
+      <video id="localVideo2" autoplay playsinline muted></video>
+      <div class="row">
+        <button class="btn primary" id="startCam2">Mulai Kamera</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Rekam Video (Kamera)</h2>
+      <button class="btn danger" id="recCam" disabled>Mulai Rekam</button>
+      <span class="timer hidden" id="camTimer">00:00</span>
+      <div><a href="#" class="dl hidden" id="camDl">Unduh video kamera (.webm)</a></div>
+    </div>
+
+    <div class="panel">
+      <h2>Rekam Layar HP</h2>
+      <div class="note warn">Browser mobile (Chrome/Safari di HP) umumnya <b>tidak mengizinkan</b> rekam layar dari web. Coba tombol ini dulu — kalau gagal, pakai fitur "Perekam Layar" bawaan HP kamu, hasilnya bisa dipakai terpisah di OBS.</div>
+      <button class="btn ghost" id="recScreen">Coba Rekam Layar</button>
+      <span class="timer hidden" id="scrTimer">00:00</span>
+      <div><a href="#" class="dl hidden" id="scrDl">Unduh rekaman layar (.webm)</a></div>
+    </div>
+  </div>
+
+  <!-- overlay -->
+  <div class="tabview hidden" id="tab-overlay">
+    <div class="segmented">
+      <button data-ov="timer" class="active">Stopwatch</button>
+      <button data-ov="countdown">Countdown</button>
+      <button data-ov="clock">Jam</button>
+    </div>
+    <div class="segmented" style="margin-top:-6px;">
+      <button data-ov="brb">BRB</button>
+      <button data-ov="ticker">Ticker Teks</button>
+    </div>
+    <div class="segmented" style="margin-top:-6px;">
+      <button data-ov="goal">Goal</button>
+      <button data-ov="lower3rd">Lower Third</button>
+    </div>
+
+    <div class="panel" id="ovPanel">
+      <h2 id="ovTitle">Stopwatch</h2>
+      <div class="stage" id="ovStage">
+        <div class="big" id="ovBig">00:00:00</div>
+      </div>
+    </div>
+
+    <!-- controls per overlay type -->
+    <div class="panel" id="ovControls">
+      <div id="ctrl-timer">
+        <div class="row">
+          <button class="btn primary" id="timerStart">Mulai</button>
+          <button class="btn ghost" id="timerPause">Jeda</button>
+          <button class="btn ghost" id="timerReset">Reset</button>
+        </div>
+      </div>
+
+      <div id="ctrl-countdown" class="hidden">
+        <div class="field-label">Durasi mundur (menit)</div>
+        <input type="number" id="cdMinutes" value="5" min="1">
+        <div class="field-label">Label (contoh: "Live dimulai dalam")</div>
+        <input type="text" id="cdLabel" value="Live dimulai dalam">
+        <div class="row">
+          <button class="btn primary" id="cdStart">Mulai</button>
+          <button class="btn ghost" id="cdReset">Reset</button>
+        </div>
+      </div>
+
+      <div id="ctrl-clock" class="hidden">
+        <p class="sub">Jam otomatis mengikuti waktu HP/PC kamu, gak perlu setting apa-apa.</p>
+      </div>
+
+      <div id="ctrl-brb" class="hidden">
+        <div class="field-label">Pesan BRB</div>
+        <input type="text" id="brbText" value="Sebentar ya, BRB">
+      </div>
+
+      <div id="ctrl-ticker" class="hidden">
+        <div class="field-label">Teks berjalan</div>
+        <input type="text" id="tickerText" value="Terima kasih sudah nonton! Jangan lupa follow ya 🎥">
+        <div class="field-label">Kecepatan</div>
+        <input type="number" id="tickerSpeed" value="14" min="4" max="40">
+        <div class="row"><button class="btn primary" id="tickerApply">Terapkan</button></div>
+      </div>
+
+      <div id="ctrl-goal" class="hidden">
+        <div class="field-label">Label (contoh: "Target Follower")</div>
+        <input type="text" id="goalLabel" value="Target Follower">
+        <div class="field-label">Nilai sekarang</div>
+        <input type="number" id="goalCurrent" value="32" min="0">
+        <div class="field-label">Target</div>
+        <input type="number" id="goalTarget" value="50" min="1">
+        <div class="row"><button class="btn primary" id="goalApply">Terapkan</button></div>
+      </div>
+
+      <div id="ctrl-lower3rd" class="hidden">
+        <div class="field-label">Nama</div>
+        <input type="text" id="l3Name" value="Nama Kamu">
+        <div class="field-label">Jabatan / keterangan</div>
+        <input type="text" id="l3Title" value="Lagi Live">
+        <div class="row"><button class="btn primary" id="l3Apply">Terapkan</button></div>
+      </div>
+
+      <div class="field-label" style="margin-top:14px;">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+          <input type="checkbox" id="ovTransparent" style="width:auto;"> Background transparan (buat Browser Source OBS)
+        </label>
+      </div>
+      <div class="field-label">Warna aksen overlay</div>
+      <input type="color" id="ovAccent" value="#3B7BFF" style="width:56px;height:34px;padding:2px;border-radius:8px;">
+      <div class="note">Tambahkan halaman ini sebagai Browser Source di OBS. Centang transparan di atas kalau mau overlay nyatu tanpa kotak hitam di belakangnya (di OBS, background browser source otomatis transparan selama halaman ini juga transparan).</div>
+    </div>
+  </div>
+
+  <!-- cek mic -->
+  <div class="tabview hidden" id="tab-mic">
+    <div class="panel">
+      <h2>Level Mic</h2>
+      <button class="btn primary" id="micStart">Mulai Cek Mic</button>
+      <div class="meter-wrap" style="margin-top:14px;"><div class="meter-bar" id="micBar"></div></div>
+      <div class="meter-num" id="micNum">— dB</div>
+      <div class="note">Bicara normal kaya pas live. Zona aman itu biru, kalau udah sering nyentuh merah artinya kekerasan / mic kamu kegedean gain-nya.</div>
+    </div>
+  </div>
+
+  <!-- qr -->
+  <div class="tabview hidden" id="tab-qr">
+    <div class="panel">
+      <h2>Buat QR Code</h2>
+      <div class="field-label">Link atau teks (misal link donasi/socmed)</div>
+      <input type="text" id="qrInput" placeholder="https://...">
+      <div class="row"><button class="btn primary" id="qrGen">Buat QR</button></div>
+    </div>
+    <div class="panel" id="qrPanel">
+      <h2>Tampilan QR (untuk OBS)</h2>
+      <div class="stage" id="qrStage">
+        <p class="sub">Belum ada QR — isi link di atas dulu.</p>
+      </div>
+    </div>
+    <div class="note">QR dibuat lewat layanan gambar publik (api.qrserver.com) — butuh koneksi internet aktif buat menampilkannya.</div>
+  </div>
+
+  <!-- soundboard -->
+  <div class="tabview hidden" id="tab-suara">
+    <div class="panel">
+      <h2>Papan Suara</h2>
+      <p class="sub" style="margin-bottom:10px;">Bunyi disintesis langsung di browser (gak perlu file). Kalau tab ini ditambahkan sebagai Browser Source di OBS (dengan "Control audio via OBS" dicentang), suaranya bisa ikut kerekam/kesiar.</p>
+      <div class="sb-grid">
+        <button class="sb-btn" data-sfx="ding">DING</button>
+        <button class="sb-btn" data-sfx="buzz">BUZZ</button>
+        <button class="sb-btn" data-sfx="tada">TADA</button>
+        <button class="sb-btn" data-sfx="drum">DRUMROLL</button>
+        <button class="sb-btn" data-sfx="horn">AIRHORN</button>
+        <button class="sb-btn" data-sfx="success">SUKSES</button>
+      </div>
+    </div>
+  </div>
+
+  </div><!-- /content -->
+  </div><!-- /layout -->
+</div>
+<button class="kiosk-btn hidden" id="kioskGlobalBtn">Layar Penuh</button>
+
+<script>
+const cfg = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+let pc, localStream;
+
+// nav tabs
+const navBtns = document.querySelectorAll('.nav button');
+navBtns.forEach(b => b.onclick = () => {
+  navBtns.forEach(x => x.classList.remove('active'));
+  b.classList.add('active');
+  document.querySelectorAll('.tabview').forEach(v => v.classList.add('hidden'));
+  document.getElementById('tab-' + b.dataset.tab).classList.remove('hidden');
+  updateKioskAvailability();
+});
+
+// switch hp/pc role
+const tabSender = document.getElementById('tabSender');
+const tabReceiver = document.getElementById('tabReceiver');
+const senderView = document.getElementById('senderView');
+const receiverView = document.getElementById('receiverView');
+tabSender.onclick = () => { tabSender.classList.add('active'); tabReceiver.classList.remove('active'); senderView.classList.remove('hidden'); receiverView.classList.add('hidden'); updateKioskAvailability(); };
+tabReceiver.onclick = () => { tabReceiver.classList.add('active'); tabSender.classList.remove('active'); receiverView.classList.remove('hidden'); senderView.classList.add('hidden'); updateKioskAvailability(); };
+
+// helpers
+function enc(obj){ return btoa(unescape(encodeURIComponent(JSON.stringify(obj)))); }
+function dec(str){ return JSON.parse(decodeURIComponent(escape(atob(str.trim())))); }
+function waitIceComplete(peer){
+  return new Promise(resolve => {
+    if (peer.iceGatheringState === 'complete') return resolve();
+    const check = () => { if (peer.iceGatheringState === 'complete'){ peer.removeEventListener('icegatheringstatechange', check); resolve(); } };
+    peer.addEventListener('icegatheringstatechange', check);
+    setTimeout(resolve, 3500);
+  });
+}
+function fmtTime(s){ const m = Math.floor(s/60).toString().padStart(2,'0'); const sec = (s%60).toString().padStart(2,'0'); return m+':'+sec; }
+
+function setupRecorder(stream, btn, timerEl, dlEl, filename){
+  let recorder, chunks = [], t0, timerInt, recording = false;
+  btn.onclick = () => {
+    if (!recording){
+      chunks = [];
+      recorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
+      recorder.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
+      recorder.onstop = () => {
+        const blob = new Blob(chunks, { type: 'video/webm' });
+        dlEl.href = URL.createObjectURL(blob);
+        dlEl.download = filename;
+        dlEl.classList.remove('hidden');
+      };
+      recorder.start();
+      t0 = Date.now();
+      timerEl.classList.remove('hidden');
+      timerInt = setInterval(() => { timerEl.textContent = fmtTime(Math.floor((Date.now()-t0)/1000)); }, 500);
+      btn.textContent = 'Berhenti Rekam';
+      recording = true;
+    } else {
+      recorder.stop();
+      clearInterval(timerInt);
+      btn.textContent = 'Mulai Rekam';
+      recording = false;
+    }
+  };
+}
+
+// camera (hp side)
+const localVideo = document.getElementById('localVideo');
+const localVideo2 = document.getElementById('localVideo2');
+const startCam = document.getElementById('startCam');
+const startCam2 = document.getElementById('startCam2');
+const flipCam = document.getElementById('flipCam');
+const makeOffer = document.getElementById('makeOffer');
+const offerOut = document.getElementById('offerOut');
+const copyOffer = document.getElementById('copyOffer');
+const answerIn = document.getElementById('answerIn');
+const connectBtn = document.getElementById('connectBtn');
+const connStatusDot = document.getElementById('connStatusDot');
+const connStatusTxt = document.getElementById('connStatusTxt');
+const tally = document.getElementById('tally');
+const recCam = document.getElementById('recCam');
+
+let facing = 'user';
+let currentDeviceId = null;
+
+async function startCamera(){
+  try{
+    if (localStream) localStream.getTracks().forEach(t => t.stop());
+    localStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: facing }, audio: true });
+    localVideo.srcObject = localStream;
+    localVideo2.srcObject = localStream;
+    startCam.textContent = 'Kamera Aktif';
+    startCam2.textContent = 'Kamera Aktif';
+    flipCam.disabled = false;
+    makeOffer.disabled = false;
+    recCam.disabled = false;
+    micMuteBtn.disabled = false;
+    micPttBtn.disabled = false;
+    snapLocal.disabled = false;
+    setupRecorder(localStream, recCam, document.getElementById('camTimer'), document.getElementById('camDl'), 'kamera-hp.webm');
+    populateCameraList();
+  }catch(err){
+    alert('Tidak bisa akses kamera: ' + err.message);
+  }
+}
+
+/* daftar kamera fisik yang kepasang di HP/PC — baru muncul labelnya setelah izin kamera dikasih */
+const camDeviceSelect = document.getElementById('camDeviceSelect');
+const camDeviceLabel = document.getElementById('camDeviceLabel');
+async function populateCameraList(){
+  try{
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const cams = devices.filter(d => d.kind === 'videoinput');
+    if (cams.length < 2) { camDeviceSelect.style.display = 'none'; camDeviceLabel.style.display = 'none'; return; }
+    camDeviceSelect.innerHTML = cams.map((c,i) => `<option value="${c.deviceId}">${c.label || 'Kamera ' + (i+1)}</option>`).join('');
+    camDeviceSelect.style.display = 'block';
+    camDeviceLabel.style.display = 'block';
+    const activeTrack = localStream.getVideoTracks()[0];
+    if (activeTrack) currentDeviceId = activeTrack.getSettings().deviceId;
+    if (currentDeviceId) camDeviceSelect.value = currentDeviceId;
+  }catch(e){ /* enumerate bisa gagal di beberapa browser lama, ga fatal */ }
+}
+camDeviceSelect.onchange = async () => { await swapVideoTrack({ deviceId: { exact: camDeviceSelect.value } }); };
+
+/* dipakai bareng sama tombol balik kamera & pilihan device — nge-replace track tanpa restart koneksi obs */
+async function swapVideoTrack(videoConstraints){
+  try{
+    const newStream = await navigator.mediaDevices.getUserMedia({ video: videoConstraints, audio: false });
+    const newTrack = newStream.getVideoTracks()[0];
+    if (pc){
+      const sender = pc.getSenders().find(s => s.track && s.track.kind === 'video');
+      if (sender) await sender.replaceTrack(newTrack);
+    }
+    const oldTrack = localStream.getVideoTracks()[0];
+    if (oldTrack){ localStream.removeTrack(oldTrack); oldTrack.stop(); }
+    localStream.addTrack(newTrack);
+    localVideo.srcObject = null; localVideo.srcObject = localStream;
+    localVideo2.srcObject = null; localVideo2.srcObject = localStream;
+    currentDeviceId = newTrack.getSettings().deviceId;
+  }catch(err){ alert('Gagal ganti kamera: ' + err.message); }
+}
+
+startCam.onclick = startCamera;
+startCam2.onclick = startCamera;
+flipCam.onclick = () => { facing = facing === 'user' ? 'environment' : 'user'; swapVideoTrack({ facingMode: facing }); };
+
+/* mic mute toggle + push-to-talk */
+const micMuteBtn = document.getElementById('micMute');
+const micPttBtn = document.getElementById('micPtt');
+let micMuted = false;
+micMuteBtn.onclick = () => {
+  micMuted = !micMuted;
+  const track = localStream.getAudioTracks()[0];
+  if (track) track.enabled = !micMuted;
+  micMuteBtn.textContent = micMuted ? 'Mic: Mati' : 'Mic: Aktif';
+};
+function pttOn(){ const t = localStream.getAudioTracks()[0]; if (t) t.enabled = true; micPttBtn.classList.add('active'); }
+function pttOff(){ const t = localStream.getAudioTracks()[0]; if (t) t.enabled = !micMuted; micPttBtn.classList.remove('active'); }
+micPttBtn.addEventListener('mousedown', pttOn); micPttBtn.addEventListener('touchstart', e => { e.preventDefault(); pttOn(); });
+micPttBtn.addEventListener('mouseup', pttOff); micPttBtn.addEventListener('mouseleave', pttOff); micPttBtn.addEventListener('touchend', pttOff);
+
+makeOffer.onclick = async () => {
+  pc = new RTCPeerConnection(cfg);
+  localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+  pc.oniceconnectionstatechange = () => {
+    const s = pc.iceConnectionState;
+    const connected = (s === 'connected' || s === 'completed');
+    tally.className = 'tally ' + (connected ? 'ok' : '');
+    connStatusDot.className = 'tally ' + (connected ? 'ok' : '');
+    connStatusTxt.textContent = connected ? 'Tersambung ke OBS' : 'Status: ' + s;
+    document.getElementById('statStateS').textContent = s;
+    if (connected) startStatsLoop(pc, 'sender'); else stopStatsLoop('sender');
+  };
+  const offer = await pc.createOffer();
+  await pc.setLocalDescription(offer);
+  await waitIceComplete(pc);
+  offerOut.value = enc(pc.localDescription);
+};
+copyOffer.onclick = () => { offerOut.select(); document.execCommand('copy'); copyOffer.textContent = 'Tersalin ✓'; setTimeout(()=>copyOffer.textContent='Salin Kode',1500); };
+connectBtn.onclick = async () => {
+  try{ const answer = dec(answerIn.value); await pc.setRemoteDescription(answer); connStatusTxt.textContent = 'Menyambungkan…'; }
+  catch(e){ alert('Kode jawaban tidak valid.'); }
+};
+
+// pc/obs side
+const offerIn = document.getElementById('offerIn');
+const makeAnswer = document.getElementById('makeAnswer');
+const answerOut = document.getElementById('answerOut');
+const copyAnswer = document.getElementById('copyAnswer');
+const remoteVideo = document.getElementById('remoteVideo');
+const rConnDot = document.getElementById('rConnDot');
+const rConnTxt = document.getElementById('rConnTxt');
+let pcR;
+makeAnswer.onclick = async () => {
+  try{
+    const offer = dec(offerIn.value);
+    pcR = new RTCPeerConnection(cfg);
+    pcR.ontrack = e => { remoteVideo.srcObject = e.streams[0]; };
+    pcR.oniceconnectionstatechange = () => {
+      const s = pcR.iceConnectionState;
+      const connected = (s === 'connected' || s === 'completed');
+      rConnDot.className = 'tally ' + (connected ? 'ok' : '');
+      rConnTxt.textContent = connected ? 'Kamera HP tersambung' : 'Status: ' + s;
+      document.getElementById('statStateR').textContent = s;
+      if (connected) startStatsLoop(pcR, 'receiver'); else stopStatsLoop('receiver');
+    };
+    await pcR.setRemoteDescription(offer);
+    const answer = await pcR.createAnswer();
+    await pcR.setLocalDescription(answer);
+    await waitIceComplete(pcR);
+    answerOut.value = enc(pcR.localDescription);
+  }catch(e){ alert('Kode dari HP tidak valid.'); }
+};
+copyAnswer.onclick = () => { answerOut.select(); document.execCommand('copy'); copyAnswer.textContent = 'Tersalin ✓'; setTimeout(()=>copyAnswer.textContent='Salin Kode Jawaban',1500); };
+
+// bitrate/rtt polling
+const statsIntervals = {};
+const statsPrev = {};
+function startStatsLoop(peer, who){
+  stopStatsLoop(who);
+  statsPrev[who] = { bytes: 0, t: Date.now() };
+  statsIntervals[who] = setInterval(async () => {
+    try{
+      const report = await peer.getStats();
+      let bitrateEl, resEl, extraEl;
+      if (who === 'sender'){ bitrateEl = 'statBitrateS'; resEl = 'statResS'; extraEl = 'statRttS'; }
+      else { bitrateEl = 'statBitrateR'; resEl = 'statResR'; extraEl = 'statLossR'; }
+      report.forEach(r => {
+        if (who === 'sender' && r.type === 'outbound-rtp' && r.kind === 'video'){
+          const now = Date.now();
+          const dt = (now - statsPrev.sender.t) / 1000;
+          const db = r.bytesSent - statsPrev.sender.bytes;
+          if (dt > 0.4){
+            const kbps = Math.max(0, Math.round((db * 8) / dt / 1000));
+            document.getElementById(bitrateEl).textContent = kbps + ' kbps';
+            statsPrev.sender = { bytes: r.bytesSent, t: now };
+          }
+          if (r.frameWidth) document.getElementById(resEl).textContent = r.frameWidth + '×' + r.frameHeight;
+        }
+        if (who === 'receiver' && r.type === 'inbound-rtp' && r.kind === 'video'){
+          const now = Date.now();
+          const dt = (now - statsPrev.receiver.t) / 1000;
+          const db = r.bytesReceived - statsPrev.receiver.bytes;
+          if (dt > 0.4){
+            const kbps = Math.max(0, Math.round((db * 8) / dt / 1000));
+            document.getElementById(bitrateEl).textContent = kbps + ' kbps';
+            statsPrev.receiver = { bytes: r.bytesReceived, t: now };
+          }
+          if (r.frameWidth) document.getElementById(resEl).textContent = r.frameWidth + '×' + r.frameHeight;
+          if (typeof r.packetsLost === 'number') document.getElementById(extraEl).textContent = r.packetsLost + ' paket';
+        }
+        if (who === 'sender' && r.type === 'candidate-pair' && r.state === 'succeeded' && typeof r.currentRoundTripTime === 'number'){
+          document.getElementById(extraEl).textContent = Math.round(r.currentRoundTripTime * 1000) + ' ms';
+        }
+      });
+    }catch(e){ /* ignore transient stats errors */ }
+  }, 1000);
+}
+function stopStatsLoop(who){ if (statsIntervals[who]) clearInterval(statsIntervals[who]); }
+
+// fullscreen mode buat browser source obs
+/* Moves the target panel out to <body> so it isn't hidden along with its tab, then restores it on exit. */
+let kioskEl = null, kioskParent = null, kioskPlaceholder = null;
+const kioskGlobalBtn = document.getElementById('kioskGlobalBtn');
+
+function enterKiosk(id, transparent){
+  const el = document.getElementById(id);
+  kioskEl = el; kioskParent = el.parentNode;
+  kioskPlaceholder = document.createComment('kiosk-slot');
+  kioskParent.insertBefore(kioskPlaceholder, el);
+  document.body.appendChild(el);
+  el.classList.add('kiosk-target-active');
+  document.body.classList.add('kiosk');
+  document.body.classList.toggle('transparent-bg', !!transparent);
+  kioskGlobalBtn.textContent = 'Keluar Layar Penuh';
+  kioskGlobalBtn.classList.remove('hidden');
+}
+function exitKiosk(){
+  if (kioskEl && kioskParent){
+    kioskEl.classList.remove('kiosk-target-active');
+    kioskParent.insertBefore(kioskEl, kioskPlaceholder);
+    kioskPlaceholder.remove();
+  }
+  kioskEl = null; kioskParent = null; kioskPlaceholder = null;
+  document.body.classList.remove('kiosk');
+  document.body.classList.remove('transparent-bg');
+  kioskGlobalBtn.textContent = 'Layar Penuh';
+  updateKioskAvailability();
+}
+
+// Which panel is eligible for kiosk right now, based on the active nav/sub-tab.
+function updateKioskAvailability(){
+  if (document.body.classList.contains('kiosk')) return; // already in kiosk, button stays as "exit"
+  const activeNav = document.querySelector('.nav button.active').dataset.tab;
+  let target = null;
+  if (activeNav === 'sambung' && !receiverView.classList.contains('hidden')){
+    target = { id: 'kioskArea', transparent: false };
+  } else if (activeNav === 'overlay'){
+    target = { id: 'ovPanel', transparent: document.getElementById('ovTransparent').checked };
+  } else if (activeNav === 'qr' && document.getElementById('qrStage').querySelector('img')){
+    target = { id: 'qrPanel', transparent: false };
+  }
+  window.__kioskTarget = target;
+  kioskGlobalBtn.classList.toggle('hidden', !target);
+}
+kioskGlobalBtn.onclick = () => {
+  if (document.body.classList.contains('kiosk')){ exitKiosk(); return; }
+  if (window.__kioskTarget) enterKiosk(window.__kioskTarget.id, window.__kioskTarget.transparent);
+};
+
+// screen record (best effort, mostly desktop only)
+const recScreen = document.getElementById('recScreen');
+recScreen.onclick = async () => {
+  try{
+    const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+    setupRecorder(screenStream, recScreen, document.getElementById('scrTimer'), document.getElementById('scrDl'), 'layar-hp.webm');
+    recScreen.click();
+  }catch(err){
+    alert('Rekam layar tidak didukung di browser ini: ' + err.message + '\\n\\nPakai fitur Perekam Layar bawaan HP kamu sebagai gantinya.');
+  }
+};
+
+// overlay stage
+const ovBtns = document.querySelectorAll('[data-ov]');
+const ovTitle = document.getElementById('ovTitle');
+const ovStage = document.getElementById('ovStage');
+const ovNames = { timer:'Stopwatch', countdown:'Countdown', clock:'Jam', brb:'BRB', ticker:'Ticker Teks', goal:'Progress Goal', lower3rd:'Lower Third' };
+let ovType = 'timer';
+let ovIntervals = [];
+function clearOvIntervals(){ ovIntervals.forEach(i => clearInterval(i)); ovIntervals = []; }
+
+function renderStage(type){
+  clearOvIntervals();
+  ovTitle.textContent = ovNames[type];
+  document.querySelectorAll('[id^="ctrl-"]').forEach(c => c.classList.add('hidden'));
+  document.getElementById('ctrl-' + type).classList.remove('hidden');
+
+  if (type === 'timer'){
+    ovStage.innerHTML = '<div class="big" id="ovBig">00:00:00</div>';
+  } else if (type === 'countdown'){
+    ovStage.innerHTML = '<div class="label" id="cdLbl">Live dimulai dalam</div><div class="big" id="ovBig">05:00</div>';
+  } else if (type === 'clock'){
+    ovStage.innerHTML = '<div class="clockbig" id="clockBig">00:00:00</div><div class="clockdate" id="clockDate"></div>';
+    const tick = () => {
+      const d = new Date();
+      document.getElementById('clockBig').textContent = d.toLocaleTimeString('id-ID');
+      document.getElementById('clockDate').textContent = d.toLocaleDateString('id-ID', { weekday:'long', day:'numeric', month:'long' });
+    };
+    tick();
+    ovIntervals.push(setInterval(tick, 1000));
+  } else if (type === 'brb'){
+    ovStage.innerHTML = '<div class="brbtext">' + document.getElementById('brbText').value + ' <span class="dots"><span>.</span><span>.</span><span>.</span></span></div>';
+  } else if (type === 'ticker'){
+    const speed = document.getElementById('tickerSpeed').value || 14;
+    ovStage.innerHTML = '<div class="ticker-wrap"><div class="ticker-move" style="animation-duration:'+speed+'s;">' + document.getElementById('tickerText').value + '</div></div>';
+  } else if (type === 'goal'){
+    const label = document.getElementById('goalLabel').value;
+    const cur = parseFloat(document.getElementById('goalCurrent').value) || 0;
+    const tgt = parseFloat(document.getElementById('goalTarget').value) || 1;
+    const pct = Math.min(100, Math.max(0, (cur/tgt)*100));
+    ovStage.innerHTML =
+      '<div class="goal-label">' + label + '</div>' +
+      '<div class="goal-bar-wrap"><div class="goal-bar-fill" style="width:' + pct + '%"></div></div>' +
+      '<div class="goal-nums">' + cur + ' / ' + tgt + '</div>';
+  } else if (type === 'lower3rd'){
+    const name = document.getElementById('l3Name').value;
+    const title = document.getElementById('l3Title').value;
+    ovStage.style.alignItems = 'stretch';
+    ovStage.innerHTML =
+      '<div class="l3-wrap"><div class="l3-accent"></div><div><div class="l3-name">' + name + '</div><div class="l3-title">' + title + '</div></div></div>';
+  }
+  if (type !== 'lower3rd') ovStage.style.alignItems = 'center';
+}
+
+ovBtns.forEach(b => b.onclick = () => {
+  document.querySelectorAll('[data-ov]').forEach(x => x.classList.remove('active'));
+  b.classList.add('active');
+  ovType = b.dataset.ov;
+  renderStage(ovType);
+});
+renderStage('timer');
+
+// timer (stopwatch) logic
+let timerSecs = 0, timerRunning = false, timerInterval;
+document.getElementById('timerStart').onclick = () => {
+  if (timerRunning) return;
+  timerRunning = true;
+  timerInterval = setInterval(() => {
+    timerSecs++;
+    const h = Math.floor(timerSecs/3600).toString().padStart(2,'0');
+    const m = Math.floor((timerSecs%3600)/60).toString().padStart(2,'0');
+    const s = (timerSecs%60).toString().padStart(2,'0');
+    const el = document.getElementById('ovBig');
+    if (el) el.textContent = h+':'+m+':'+s;
+  }, 1000);
+};
+document.getElementById('timerPause').onclick = () => { timerRunning = false; clearInterval(timerInterval); };
+document.getElementById('timerReset').onclick = () => {
+  timerRunning = false; clearInterval(timerInterval); timerSecs = 0;
+  const el = document.getElementById('ovBig'); if (el) el.textContent = '00:00:00';
+};
+
+// countdown logic
+let cdRemaining = 0, cdInterval;
+document.getElementById('cdStart').onclick = () => {
+  clearInterval(cdInterval);
+  cdRemaining = (parseInt(document.getElementById('cdMinutes').value) || 5) * 60;
+  document.getElementById('cdLbl') && (document.getElementById('cdLbl').textContent = document.getElementById('cdLabel').value);
+  const update = () => {
+    const m = Math.floor(cdRemaining/60).toString().padStart(2,'0');
+    const s = (cdRemaining%60).toString().padStart(2,'0');
+    const el = document.getElementById('ovBig');
+    if (el) el.textContent = m+':'+s;
+    if (cdRemaining <= 0){ clearInterval(cdInterval); return; }
+    cdRemaining--;
+  };
+  update();
+  cdInterval = setInterval(update, 1000);
+};
+document.getElementById('cdReset').onclick = () => {
+  clearInterval(cdInterval);
+  const el = document.getElementById('ovBig'); if (el) el.textContent = '00:00';
+};
+
+// brb live update
+document.getElementById('brbText').oninput = () => { if (ovType === 'brb') renderStage('brb'); };
+// ticker apply
+document.getElementById('tickerApply').onclick = () => renderStage('ticker');
+// goal & lower third apply
+document.getElementById('goalApply').onclick = () => renderStage('goal');
+document.getElementById('l3Apply').onclick = () => renderStage('lower3rd');
+
+document.getElementById('ovTransparent').onchange = (e) => {
+  ovStage.classList.toggle('transparent-preview', e.target.checked);
+  updateKioskAvailability();
+};
+
+// mic meter
+const micStart = document.getElementById('micStart');
+const micBar = document.getElementById('micBar');
+const micNum = document.getElementById('micNum');
+let micRunning = false, micStream, audioCtx, analyser, micRaf;
+micStart.onclick = async () => {
+  if (micRunning){
+    micRunning = false;
+    cancelAnimationFrame(micRaf);
+    if (micStream) micStream.getTracks().forEach(t => t.stop());
+    if (audioCtx) audioCtx.close();
+    micStart.textContent = 'Mulai Cek Mic';
+    micBar.style.width = '0%';
+    micNum.textContent = '— dB';
+    return;
+  }
+  try{
+    micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const src = audioCtx.createMediaStreamSource(micStream);
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 512;
+    src.connect(analyser);
+    const data = new Uint8Array(analyser.frequencyBinCount);
+    micRunning = true;
+    micStart.textContent = 'Berhenti';
+    const loop = () => {
+      if (!micRunning) return;
+      analyser.getByteFrequencyData(data);
+      let sum = 0; for (let i=0;i<data.length;i++) sum += data[i];
+      const avg = sum / data.length;
+      const pct = Math.min(100, (avg/255)*130);
+      micBar.style.width = pct + '%';
+      micNum.textContent = Math.round(avg) + ' / 255';
+      micRaf = requestAnimationFrame(loop);
+    };
+    loop();
+  }catch(err){ alert('Tidak bisa akses mic: ' + err.message); }
+};
+
+// qr
+document.getElementById('qrGen').onclick = () => {
+  const val = document.getElementById('qrInput').value.trim();
+  const stage = document.getElementById('qrStage');
+  if (!val){ stage.innerHTML = '<p class="sub">Isi link/teks dulu ya.</p>'; updateKioskAvailability(); return; }
+  const url = 'https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=' + encodeURIComponent(val);
+  stage.innerHTML = '<img class="qr-img" src="' + url + '" alt="QR Code">';
+  updateKioskAvailability();
+};
+
+// soundboard, synth pake web audio jadi ga perlu file mp3
+let sbCtx;
+function getSbCtx(){ if (!sbCtx) sbCtx = new (window.AudioContext || window.webkitAudioContext)(); return sbCtx; }
+function tone(ctx, freq, start, dur, type, gainPeak, dest){
+  const osc = ctx.createOscillator(); const gain = ctx.createGain();
+  osc.type = type || 'sine'; osc.frequency.setValueAtTime(freq, start);
+  gain.gain.setValueAtTime(0, start);
+  gain.gain.linearRampToValueAtTime(gainPeak || 0.3, start + 0.01);
+  gain.gain.exponentialRampToValueAtTime(0.001, start + dur);
+  osc.connect(gain); gain.connect(dest);
+  osc.start(start); osc.stop(start + dur + 0.02);
+  return osc;
+}
+function noiseBurst(ctx, start, dur, dest, sweepFrom, sweepTo){
+  const bufferSize = ctx.sampleRate * dur;
+  const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < bufferSize; i++) data[i] = Math.random()*2-1;
+  const src = ctx.createBufferSource(); src.buffer = buffer;
+  const filter = ctx.createBiquadFilter(); filter.type = 'bandpass';
+  filter.frequency.setValueAtTime(sweepFrom, start);
+  filter.frequency.linearRampToValueAtTime(sweepTo, start + dur);
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(0.5, start);
+  gain.gain.exponentialRampToValueAtTime(0.001, start + dur);
+  src.connect(filter); filter.connect(gain); gain.connect(dest);
+  src.start(start); src.stop(start + dur + 0.02);
+}
+const sfx = {
+  ding(ctx){ const now = ctx.currentTime; tone(ctx, 1400, now, 0.5, 'sine', 0.35, ctx.destination); tone(ctx, 2100, now+0.02, 0.4, 'sine', 0.15, ctx.destination); },
+  buzz(ctx){ const now = ctx.currentTime; tone(ctx, 110, now, 0.35, 'sawtooth', 0.3, ctx.destination); tone(ctx, 98, now+0.05, 0.35, 'sawtooth', 0.25, ctx.destination); },
+  tada(ctx){ const now = ctx.currentTime; [523,659,784,1046].forEach((f,i) => tone(ctx, f, now + i*0.09, 0.4, 'triangle', 0.28, ctx.destination)); },
+  drum(ctx){ const now = ctx.currentTime; noiseBurst(ctx, now, 0.8, ctx.destination, 200, 1200); },
+  horn(ctx){ const now = ctx.currentTime; tone(ctx, 220, now, 0.9, 'sawtooth', 0.3, ctx.destination); tone(ctx, 221, now, 0.9, 'sawtooth', 0.3, ctx.destination); },
+  success(ctx){ const now = ctx.currentTime; tone(ctx, 660, now, 0.25, 'sine', 0.3, ctx.destination); tone(ctx, 880, now+0.15, 0.35, 'sine', 0.3, ctx.destination); }
+};
+document.querySelectorAll('.sb-btn').forEach(btn => {
+  btn.onclick = () => { const ctx = getSbCtx(); if (ctx.state === 'suspended') ctx.resume(); sfx[btn.dataset.sfx](ctx); };
+});
+
+updateKioskAvailability();
+
+// screenshot: ambil frame video yang lagi tampil, download sebagai png
+function snapVideo(videoEl, filename){
+  if (!videoEl.videoWidth) { alert('Belum ada gambar buat di-screenshot.'); return; }
+  const canvas = document.createElement('canvas');
+  canvas.width = videoEl.videoWidth; canvas.height = videoEl.videoHeight;
+  canvas.getContext('2d').drawImage(videoEl, 0, 0);
+  const a = document.createElement('a');
+  a.href = canvas.toDataURL('image/png');
+  a.download = filename;
+  a.click();
+}
+const snapLocal = document.getElementById('snapLocal');
+const snapRemote = document.getElementById('snapRemote');
+snapLocal.onclick = () => snapVideo(localVideo, 'screenshot-kamera.png');
+snapRemote.onclick = () => snapVideo(remoteVideo, 'screenshot-obs.png');
+remoteVideo.addEventListener('loadedmetadata', () => { snapRemote.disabled = false; });
+
+// warna aksen overlay, dipake buat goal bar / label / lower third — cuma scoped ke overlay, ga ganggu warna tombol lain
+document.getElementById('ovAccent').oninput = (e) => {
+  document.documentElement.style.setProperty('--ov-accent', e.target.value);
+};
+
+// pintasan keyboard buat yang mantengin di desktop, dimatiin kalau lagi ngetik di form
+window.addEventListener('keydown', (e) => {
+  const tag = (e.target.tagName || '').toLowerCase();
+  if (tag === 'input' || tag === 'textarea') return;
+  if (e.code === 'Space'){ e.preventDefault(); if (!micMuteBtn.disabled) micMuteBtn.click(); }
+  if (e.key === 'r' || e.key === 'R'){ if (!recCam.disabled) recCam.click(); }
+});
+</script>
+</body>
+</html>

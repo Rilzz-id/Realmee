@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no">
+<title>RILZZ.STREAM — toolkit obs</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#05070E;
+    --panel:rgba(18,26,48,.5);
+    --panel-2:rgba(24,34,60,.55);
+    --line:rgba(255,255,255,.10);
+    --text:#EAF0FF;
+    --muted:#8E9AC2;
+    --live:#FF3B57;
+    --live-dim:rgba(255,59,87,.22);
+    --ok:#3B7BFF;
+    --ok-dim:rgba(59,123,255,.22);
+    --amber:#FF6B8B;
+    --ov-accent:#3B7BFF;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background-color:var(--bg);
+    background-image:
+      radial-gradient(circle at 12% 8%, rgba(59,123,255,.28), transparent 45%),
+      radial-gradient(circle at 92% 18%, rgba(255,59,87,.22), transparent 40%),
+      radial-gradient(circle at 30% 95%, rgba(59,123,255,.14), transparent 45%);
+    background-attachment:fixed;
+    color:var(--text);
+    font-family:'Inter',system-ui,sans-serif;
+    -webkit-tap-highlight-color:transparent;
+    min-height:100vh;
+  }
+  .wrap{max-width:480px;margin:0 auto;padding:16px 14px 48px;}
+  .layout{display:block;}
+  .content{min-width:0;}
+
+  /* handmade touches: a little grain + a tilted signature tag so it doesn't read as a flat generated ui */
+  body::before{
+    content:'';position:fixed;inset:0;pointer-events:none;opacity:.035;z-index:1;mix-blend-mode:overlay;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  .signature{
+    display:inline-block;font-family:'Oswald',sans-serif;font-size:10.5px;color:var(--muted);
+    transform:rotate(-2deg);letter-spacing:.5px;margin-left:8px;opacity:.7;
+  }
+
+  .head{display:flex;align-items:center;gap:10px;margin-bottom:14px;}
+  .tally{width:11px;height:11px;border-radius:50%;background:var(--muted);flex-shrink:0;transition:background .2s;}
+  .tally.live{background:var(--live);box-shadow:0 0 0 4px var(--live-dim);}
+  .tally.ok{background:var(--ok);box-shadow:0 0 0 4px var(--ok-dim);}
+  h1{font-family:'Oswald',sans-serif;font-weight:700;font-size:21px;margin:0;line-height:1.1;
+    background:linear-gradient(90deg,#7FA8FF,#FF8FA3);-webkit-background-clip:text;background-clip:text;color:transparent;}
+  .sub{color:var(--muted);font-size:12.5px;margin:2px 0 0;}
+
+  /* main nav */
+  .nav{display:flex;gap:6px;overflow-x:auto;margin-bottom:14px;padding-bottom:2px;-ms-overflow-style:none;scrollbar-width:none;}
+  .nav::-webkit-scrollbar{display:none;}
+  .nav button{
+    flex:0 0 auto;border:1px solid var(--line);background:rgba(255,255,255,.04);backdrop-filter:blur(8px);color:var(--muted);
+    font-family:'Oswald',sans-serif;font-weight:500;font-size:12px;letter-spacing:.4px;
+    padding:9px 14px;border-radius:20px;cursor:pointer;white-space:nowrap;
+  }
+  .nav button.active{background:linear-gradient(90deg,var(--ok),#6D5CFF);color:#fff;border-color:transparent;}
+
+  .panel{background:var(--panel);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:14px;box-shadow:0 8px 24px rgba(0,0,0,.25);}
+  .panel h2{font-family:'Oswald',sans-serif;font-size:14px;font-weight:600;margin:0 0 10px;color:var(--muted);letter-spacing:.3px;}
+
+  video{width:100%;border-radius:8px;background:#000;display:block;aspect-ratio:9/16;object-fit:cover;}
+  #remoteVideo{aspect-ratio:16/9;}
+
+  .row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}
+  button.btn{
+    font-family:'Inter',sans-serif;font-weight:600;font-size:14px;
+    border:1px solid var(--line);background:rgba(255,255,255,.05);backdrop-filter:blur(10px);color:var(--text);
+    padding:11px 14px;border-radius:9px;cursor:pointer;flex:1;min-width:120px;
+  }
+  button.btn:active{transform:scale(.98);}
+  button.btn.primary{background:linear-gradient(135deg,var(--ok),#6D5CFF);border-color:transparent;color:#fff;box-shadow:0 4px 16px rgba(59,123,255,.35);}
+  button.btn.danger{background:linear-gradient(135deg,var(--live),#FF7A5C);border-color:transparent;color:#fff;box-shadow:0 4px 16px rgba(255,59,87,.3);}
+  button.btn.ghost{background:rgba(255,255,255,.03);}
+  button.btn:disabled{opacity:.35;cursor:default;box-shadow:none;}
+
+  textarea, input[type=text], input[type=number]{
+    width:100%;background:rgba(0,0,0,.35);color:var(--text);border:1px solid var(--line);
+    border-radius:8px;padding:10px;font-family:'JetBrains Mono',monospace;font-size:12px;
+  }
+  textarea{min-height:64px;resize:vertical;}
+  .field-label{font-size:12px;color:var(--muted);margin:10px 0 5px;}
+  .status{font-size:13px;color:var(--muted);display:flex;align-items:center;gap:7px;margin-top:8px;}
+  .note{font-size:12px;color:var(--muted);line-height:1.5;background:rgba(59,123,255,.08);border:1px solid rgba(59,123,255,.25);border-radius:8px;padding:10px;margin-top:10px;}
+  .note.warn{background:rgba(255,59,87,.08);border-color:rgba(255,59,87,.28);}
+  .steps{font-size:13px;color:var(--muted);line-height:1.7;margin:0 0 4px;padding-left:18px;}
+  .timer{font-family:'Oswald',sans-serif;font-size:13px;color:var(--live);}
+  a.dl{color:var(--ok);font-size:13px;text-decoration:underline;display:inline-block;margin-top:6px;}
+  .hidden{display:none !important;}
+
+  /* sub-tabs (pill segmented control) */
+  .segmented{display:flex;background:rgba(0,0,0,.3);border:1px solid var(--line);border-radius:10px;padding:3px;margin-bottom:12px;}
+  .segmented button{flex:1;border:0;background:transparent;color:var(--muted);font-size:12.5px;font-weight:600;padding:8px 4px;border-radius:7px;cursor:pointer;}
+  .segmented button.active{background:var(--panel-2);color:var(--text);}
+
+  /* generic output stage for overlay/qr, capturable as OBS browser source */
+  .stage{
+    background:#000;border-radius:10px;min-height:220px;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;text-align:center;overflow:hidden;position:relative;
+    padding:20px;border:1px solid var(--line);
+  }
+  .stage.transparent-preview{background:repeating-conic-gradient(#22262b 0% 25%, #191c20 0% 50%) 50%/16px 16px;}
+  .stage .big{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:15vw;max-font-size:64px;color:#fff;line-height:1;}
+  .stage .label{font-family:'Oswald',sans-serif;color:var(--ov-accent);font-size:14px;margin-bottom:6px;letter-spacing:1px;text-transform:uppercase;}
+  .stage .brbtext{font-family:'Oswald',sans-serif;font-size:32px;color:#fff;font-weight:600;}
+  .stage .dots span{opacity:.2;animation:blink 1.4s infinite;}
+  .stage .dots span:nth-child(2){animation-delay:.2s;}
+  .stage .dots span:nth-child(3){animation-delay:.4s;}
+  @keyframes blink{0%,80%,100%{opacity:.2;}40%{opacity:1;}}
+  .ticker-wrap{width:100%;overflow:hidden;background:rgba(0,0,0,.6);padding:10px 0;position:absolute;bottom:0;left:0;}
+  .ticker-move{display:inline-block;white-space:nowrap;font-family:'Oswald',sans-serif;font-size:22px;color:#fff;padding-left:100%;animation:tick linear infinite;}
+  @keyframes tick{from{transform:translateX(0);}to{transform:translateX(-100%);}}
+  .clockbig{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:52px;color:#fff;}
+  .clockdate{font-family:'Oswald',sans-serif;color:var(--muted);font-size:14px;margin-top:4px;}
+
+  .qr-img{width:100%;max-width:260px;border-radius:8px;background:#fff;padding:10px;}
+
+  /* mic meter */
+  .meter-wrap{background:rgba(0,0,0,.35);border:1px solid var(--line);border-radius:8px;height:26px;overflow:hidden;position:relative;}
+  .meter-bar{height:100%;width:0%;background:linear-gradient(90deg,var(--ok),var(--amber) 75%,var(--live) 92%);transition:width .06s linear;}
+  .meter-num{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--muted);margin-top:6px;}
+
+  /* stats */
+  .stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px;}
+  .stat-box{background:rgba(0,0,0,.35);border:1px solid var(--line);border-radius:8px;padding:9px 10px;}
+  .stat-box .k{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;}
+  .stat-box .v{font-family:'JetBrains Mono',monospace;font-size:15px;color:var(--text);margin-top:2px;}
+
+  /* mic controls */
+  .ptt-btn{user-select:none;}
+  .ptt-btn.active{background:var(--live) !important;border-color:var(--live) !important;color:#210606 !important;}
+
+  /* goal bar overlay */
+  .goal-label{font-family:'Oswald',sans-serif;color:var(--ov-accent);font-size:16px;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;}
+  .goal-bar-wrap{width:90%;height:26px;background:rgba(255,255,255,.12);border-radius:13px;overflow:hidden;}
+  .goal-bar-fill{height:100%;background:var(--ov-accent);border-radius:13px;transition:width .4s ease;}
+  .goal-nums{font-family:'JetBrains Mono',monospace;color:#fff;font-size:15px;margin-top:8px;}
+
+  /* lower third */
+  .l3-wrap{align-self:flex-start;margin-top:auto;margin-bottom:24px;text-align:left;display:flex;}
+  .l3-accent{width:5px;background:var(--ov-accent);border-radius:3px;margin-right:12px;}
+  .l3-name{font-family:'Oswald',sans-serif;font-size:26px;font-weight:600;color:#fff;}
+  .l3-title{font-family:'Inter',sans-serif;font-size:13px;color:var(--ov-accent);margin-top:2px;text-transform:uppercase;letter-spacing:1px;}
+
+  /* soundboard */
+  .sb-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .sb-btn{background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:18px 10px;color:var(--text);font-family:'Oswald',sans-serif;font-weight:600;font-size:14px;cursor:pointer;text-align:center;}
+  .sb-btn:active{transform:scale(.96);background:var(--ok);color:#0B1710;}
+
+  .kiosk-btn{position:fixed;top:10px;right:10px;z-index:20;background:rgba(0,0,0,.6);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:8px 12px;font-size:12px;cursor:pointer;}
+  body.kiosk .wrap{display:none;}
+  .kiosk-target-active{
+    position:fixed;inset:0;z-index:10;padding:16px;margin:0;border:0;border-radius:0;
+    background:var(--bg);display:flex;flex-direction:column;overflow:auto;
+  }
+  .kiosk-target-active .stage{flex:1;border-radius:0;min-height:0;}
+  .kiosk-target-active video{width:100%;height:100%;border-radius:0;aspect-ratio:auto;flex:1;object-fit:cover;}
+  body.kiosk.transparent-bg{background:transparent !important;}
+  body.kiosk.transparent-bg .kiosk-target-active{background:transparent !important;}
+  body.kiosk.transparent-bg .stage{background:transparent !important;}
+
+  /* desktop: sidebar nav instead of a horizontal pill scroller, content gets breathing room */
+  @media (min-width: 860px){
+    .wrap{max-width:1080px;padding:32px 28px 60px;}
+    .head{margin-bottom:24px;}
+    h1{font-size:26px;}
+    .layout{display:grid;grid-template-columns:190px 1fr;gap:28px;align-items:start;}
+    .nav{flex-direction:column;overflow:visible;position:sticky;top:24px;gap:8px;}
+    .nav button{width:100%;text-align:left;border-radius:9px;padding:11px 14px;}
+    .content{max-width:640px;}
+    video{max-height:60vh;}
+    .sb-grid{grid-template-columns:repeat(3,1fr);}
+  }
+  @media (min-width: 1180px){
+    .content{max-width:720px;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="head">
+    <div class="tally" id="tally"></div>
+    <div>
+      <h1>RILZZ.STREAM<span class="signature">— built by rilzz</span></h1>
+      <p class="sub">sambungan &amp; overlay obs, langsung dari browser</p>
+    </div>
+  </div>
+
+  <div class="layout">
+  <div class="nav">
+    <button data-tab="sambung" class="active">SAMBUNG</button>
+    <button data-tab="rekam">REKAM</button>
+    <button data-tab="overlay">OVERLAY</button>
+    <button data-tab="mic">MIC</button>
+    <button data-tab="qr">QR</button>
+    <button data-tab="suara">SFX</button>
+  </div>
+
+  <div class="content">
+  <!-- sambung -->
+  <div class="tabview" id="tab-sambung">
+    <div class="segmented">
+      <button id="tabSender" class="active">HP · Kirim Kamera</button>
+      <button id="tabReceiver">PC/OBS · Terima</button>
+    </div>
+
+    <div id="senderView">
+      <div class="panel">
+        <h2>Pratinjau Kamera</h2>
+        <video id="localVideo" autoplay playsinline muted></video>
+        <div class="row">
+          <button class="btn primary" id="startCam">Mulai Kamera</button>
+          <button class="btn ghost" id="flipCam" disabled>Balik Kamera</button>
+        </div>
+        <div class="field-label" id="camDeviceLabel" style="display:none;">Pilih kamera (kalau ada lebih dari satu, misal webcam USB di PC)</div>
+        <select id="camDeviceSelect" style="display:none;width:100%;background:rgba(0,0,0,.35);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:9px;font-family:'Inter',sans-serif;font-size:13px;"></select>
+        <div class="row">
+          <button class="btn ghost" id="micMute" disabled>Mic: Aktif</button>
+          <button class="btn ghost ptt-btn" id="micPtt" disabled>Tahan buat Bicara</button>
+        </div>
+        <div class="row">
+          <button class="btn ghost" id="snapLocal" disabled>Ambil Screenshot</button>
+        </div>
+        <p class="sub" style="margin-top:6px;">Ganti kamera &amp; mic bisa dipakai sambil tetap tersambung ke OBS, gak perlu sambung ulang. Pintasan keyboard (desktop): Spasi = mute mic, R = rekam.</p>
+      </div>
+
+      <div class="panel">
+        <h2>Sambungkan ke OBS</h2>
+        <ol class="steps">
+          <li>Buka halaman ini juga di PC (tempat OBS jalan), pilih tab "PC/OBS".</li>
+          <li>Di HP, tekan "Buat Kode" lalu salin kodenya.</li>
+          <li>Tempel kode itu di PC, lalu salin "Kode Jawaban" dari PC ke sini.</li>
+        </ol>
+        <button class="btn primary" id="makeOffer" disabled>Buat Kode Sambungan</button>
+        <div class="field-label">Kode dari HP (salin ke PC)</div>
+        <textarea id="offerOut" readonly placeholder="Muncul setelah tekan tombol di atas…"></textarea>
+        <button class="btn ghost" id="copyOffer">Salin Kode</button>
+
+        <div class="field-label">Tempel Kode Jawaban dari PC di sini</div>
+        <textarea id="answerIn" placeholder="Tempel kode jawaban dari PC…"></textarea>
+        <button class="btn primary" id="connectBtn">Sambungkan</button>
+        <div class="status"><span id="connStatusDot" class="tally"></span><span id="connStatusTxt">Belum tersambung</span></div>
+      </div>
+
+      <div class="panel">
+        <h2>Statistik Koneksi</h2>
+        <div class="stats-grid">
+          <div class="stat-box"><div class="k">Bitrate</div><div class="v" id="statBitrateS">—</div></div>
+          <div class="stat-box"><div class="k">Resolusi</div><div class="v" id="statResS">—</div></div>
+          <div class="stat-box"><div class="k">RTT</div><div class="v" id="statRttS">—</div></div>
+          <div class="stat-box"><div class="k">Status</div><div class="v" id="statStateS">idle</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="receiverView" class="hidden">
+      <div class="panel">
+        <h2>Terima dari HP</h2>
+        <div class="field-label">Tempel Kode dari HP di sini</div>
+        <textarea id="offerIn" placeholder="Tempel kode dari HP…"></textarea>
+        <button class="btn primary" id="makeAnswer">Buat Kode Jawaban</button>
+
+        <div class="field-label">Kode Jawaban (salin balik ke HP)</div>
+        <textarea id="answerOut" readonly placeholder="Muncul setelah tekan tombol di atas…"></textarea>
+        <button class="btn ghost" id="copyAnswer">Salin Kode Jawaban</button>
+        <div class="status"><span id="rConnDot" class="tally"></span><span id="rConnTxt">Menunggu sambungan…</span></div>
+      </div>
+
+      <div class="panel">
+        <h2>Statistik Koneksi</h2>
+        <div class="stats-grid">
+          <div class="stat-box"><div class="k">Bitrate</div><div class="v" id="statBitrateR">—</div></div>
+          <div class="stat-box"><div class="k">Resolusi</div><div class="v" id="statResR">—</div></div>
+          <div class="stat-box"><div class="k">Paket Hilang</div><div class="v" id="statLossR">—</div></div>
+          <div class="stat-box"><div class="k">Status</div><div class="v" id="statStateR">idle</div></div>
+        </div>
+      </div>
+
+      <div class="panel" id="kioskArea">
+        <h2>Tampilan Kamera HP (untuk OBS)</h2>
+        <video id="remoteVideo" autoplay playsinline></video>
+        <div class="row"><button class="btn ghost" id="snapRemote" disabled>Ambil Screenshot</button></div>
+        <div class="note">Tambahkan halaman ini sebagai "Browser Source" di OBS, lalu tekan "Layar Penuh" di pojok kanan atas biar bersih tanpa panel ini.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- rekam -->
+  <div class="tabview hidden" id="tab-rekam">
+    <div class="panel">
+      <h2>Kamera buat Rekam</h2>
+      <p class="sub" style="margin-bottom:8px;">Pakai kamera yang sama dari tab Sambung. Kalau belum aktif, tekan tombol ini dulu.</p>
+      <video id="localVideo2" autoplay playsinline muted></video>
+      <div class="row">
+        <button class="btn primary" id="startCam2">Mulai Kamera</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Rekam Video (Kamera)</h2>
+      <button class="btn danger" id="recCam" disabled>Mulai Rekam</button>
+      <span class="timer hidden" id="camTimer">00:00</span>
+      <div><a href="#" class="dl hidden" id="camDl">Unduh video kamera (.webm)</a></div>
+    </div>
+
+    <div class="panel">
+      <h2>Rekam Layar HP</h2>
+      <div class="note warn">Browser mobile (Chrome/Safari di HP) umumnya <b>tidak mengizinkan</b> rekam layar dari web. Coba tombol ini dulu — kalau gagal, pakai fitur "Perekam Layar" bawaan HP kamu, hasilnya bisa dipakai terpisah di OBS.</div>
+      <button class="btn ghost" id="recScreen">Coba Rekam Layar</button>
+      <span class="timer hidden" id="scrTimer">00:00</span>
+      <div><a href="#" class="dl hidden" id="scrDl">Unduh rekaman layar (.webm)</a></div>
+    </div>
+  </div>
+
+  <!-- overlay -->
+  <div class="tabview hidden" id="tab-overlay">
+    <div class="segmented">
+      <button data-ov="timer" class="active">Stopwatch</button>
+      <button data-ov="countdown">Countdown</button>
+      <button data-ov="clock">Jam</button>
+    </div>
+    <div class="segmented" style="margin-top:-6px;">
+      <button data-ov="brb">BRB</button>
+      <button data-ov="ticker">Ticker Teks</button>
+    </div>
+    <div class="segmented" style="margin-top:-6px;">
+      <button data-ov="goal">Goal</button>
+      <button data-ov="lower3rd">Lower Third</button>
+    </div>
+
+    <div class="panel" id="ovPanel">
+      <h2 id="ovTitle">Stopwatch</h2>
+      <div class="stage" id="ovStage">
+        <div class="big" id="ovBig">00:00:00</div>
+      </div>
+    </div>
+
+    <!-- controls per overlay type -->
+    <div class="panel" id="ovControls">
+      <div id="ctrl-timer">
+        <div class="row">
+          <button class="btn primary" id="timerStart">Mulai</button>
+          <button class="btn ghost" id="timerPause">Jeda</button>
+          <button class="btn ghost" id="timerReset">Reset</button>
+        </div>
+      </div>
+
+      <div id="ctrl-countdown" class="hidden">
+        <div class="field-label">Durasi mundur (menit)</div>
+        <input type="number" id="cdMinutes" value="5" min="1">
+        <div class="field-label">Label (contoh: "Live dimulai dalam")</div>
+        <input type="text" id="cdLabel" value="Live dimulai dalam">
+        <div class="row">
+          <button class="btn primary" id="cdStart">Mulai</button>
+          <button class="btn ghost" id="cdReset">Reset</button>
+        </div>
+      </div>
+
+      <div id="ctrl-clock" class="hidden">
+        <p class="
